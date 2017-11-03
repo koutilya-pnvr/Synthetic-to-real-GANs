@@ -4,7 +4,7 @@ sys.path.insert(0, '/cfarhomes/sriram12/semantic/')
 import numpy as np
 import os
 from image_reader import *
-from face_reader import *
+from cityscape_reader import *
 from utils import *
 from argparse import ArgumentParser
 import h5py
@@ -26,10 +26,13 @@ class face_gen():
 		gen_imgs=self.netG(z,reuse,is_training)
 		return gen_imgs
 
-	def train_gta(self,x,z,labels,reuse,is_training=True,gen_lr=2e-4,disc_lr=2e-4):
-		ys=tf.one_hot(labels,self.num_classes)
-		features=self.netF(x,reuse=reuse,is_training=is_training)
-		gen_out=self.netG(z,ys,reuse=reuse,is_training=is_training)
+	def train_gta(self,x,z,reuse,is_training=True,gen_lr=2e-4,disc_lr=2e-4):
+		ys=tf.one_hot(labels,self.num_classes) 
+
+		gen_in=conv_cond_concat(x,z)
+
+		#features=self.netF(x,reuse=reuse,is_training=is_training)
+		gen_out=self.netG(gen_in,reuse=reuse,is_training=is_training)
 		[disc_out_gen_type,disc_out_gen_class]=self.netD(gen_out,ys,reuse=reuse,is_training=is_training)
 		[disc_out_images_type,disc_out_images_class]=self.netD(x,ys,reuse=True,is_training=is_training)
 
@@ -65,7 +68,7 @@ class face_gen():
 		imgs_batch=(imgs_batch-127.0)/127.0
 
 		# Layer 1
-		conv1_1=conv2d(imgs_batch,[3,3],64,'conv1_1',is_training,strides=[1,2,2,1],params=self.params,reuse=reuse,batch_norm=False)
+		conv1_1=conv2d(imgs_batch,[3,3],64,'conv1_1',is_training,strides=[1,2,2,1],params=self.params,reuse=reuse,batch_norm=False) # D! what happens if we incorporate batchnorm here?
 		conv1_1=Activation(conv1_1,'relu')
 		print_shape(conv1_1)
 
@@ -74,7 +77,7 @@ class face_gen():
 		print_shape(conv1_2)
 		
 		# Layer 2
-		conv2_1=conv2d(pool1,[3,3],128,'conv2_1',is_training,strides=[1,2,2,1],params=self.params,reuse=reuse)
+		conv2_1=conv2d(conv1_2,[3,3],128,'conv2_1',is_training,strides=[1,2,2,1],params=self.params,reuse=reuse)
 		conv2_1=Activation(conv2_1,'relu')
 		print_shape(conv2_1)
 
@@ -83,7 +86,7 @@ class face_gen():
 		print_shape(conv2_2)
 		
 		# Layer 3
-		conv3_1=conv2d(pool2,[3,3],256,'conv3_1',is_training,strides=[1,2,2,1],params=self.params,reuse=reuse)
+		conv3_1=conv2d(conv2_2,[3,3],256,'conv3_1',is_training,strides=[1,2,2,1],params=self.params,reuse=reuse)
 		conv3_1=Activation(conv3_1,'relu')
 		print_shape(conv3_1)
 
@@ -93,7 +96,7 @@ class face_gen():
 		return conv3_1
 
 
-	def netG(self,rand_input,features,reuse,is_training):
+	def netG(self,rand_input,reuse,is_training):
 		rand_input=tf.reshape(rand_input,[-1,self.sample_size])
 		gen_input=rand_input
 		with tf.variable_scope('generator'):
@@ -164,17 +167,19 @@ def train_scene_gen():
 	viz_every=3
 	save_every=10
 	base_lr=5e-6
-	logfile_path='/scratch0/sriram/models/logfile_domain'
+	logfile_path='/fs/vulcan-scratch/koutilya/projects/Synthetic-to-real-GANs/models/logfile_domain'
 	# model_file_path='/scratch0/sriram/models/vgg_face.h5'
-	model_save_path='/scratch0/sriram/models/face_gen/face_gen'
+	model_save_path='/fs/vulcan-scratch/koutilya/projects/Synthetic-to-real-GANs/models/cityscape_gen/cityscape_gen'
 	#epoch_number=20
-	source_data_dir=os.path.join('/scratch0/sriram/umdfaces_aligned/')
+	source_data_dir=os.path.join('/vulcan/scratch/koutilya/cityscapes/')
 	# target_data_dir=os.path.join('/scratch0/sriram/frames_aligned/')
 	batch_size=50
 	batch_size_valid=10
 	sample_size=200
+
+	reader=cityscape_images_reader('/vulcan/scratch/koutilya/cityscapes/',100,False,image_size=[144,144,3])
 	#reader_target=face_reader(target_data_dir,batch_size,)
-	reader=face_reader(source_data_dir,batch_size,'umdfaces_train.txt',image_size=[144,144,3])
+	# reader=face_reader(source_data_dir,batch_size,'umdfaces_train.txt',image_size=[144,144,3])
 	# reader_valid=face_reader(source_data_dir,batch_size_valid,'umdfaces_val.txt',image_size=[224,224,3])
 	# reader_target=face_reader(target_data_dir,batch_size,'umdvideos_train.txt',image_size=[224,224,3])
 	# reader_target_valid=face_reader(target_data_dir,batch_size_valid,'umdvideos_val.txt',image_size=[224,224,3])

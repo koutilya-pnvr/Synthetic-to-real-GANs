@@ -78,11 +78,11 @@ def dropout(x, keep_prob,phase_train):
 	return tf.nn.dropout(x, keep_prob) if phase_train is True else x
 
 def print_shape(obj):
-	print obj.name,obj.get_shape().as_list();
+	print obj.name,obj.get_shape().as_list()
 
 
 def conv_cond_concat(tensor,ys):
-	batch_size=tf.shape(tensor)[0]
+	#batch_size=tf.shape(tensor)[0]
 	shape=get_shape(tensor)[1:-1]
 	ysr=tf.tile(tf.reshape(ys,[-1,1,1,get_shape(ys)[-1]]),[1,shape[0],shape[-1],1])
 	return tf.concat([tensor,ysr],axis=3)

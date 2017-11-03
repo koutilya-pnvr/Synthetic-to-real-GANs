@@ -4,24 +4,36 @@ import glob
 from math import floor, ceil
 import os
 import random
-class face_reader():
+class cityscape_images_reader():
 	def shuffle_data(self):
 		self.indices=np.arange(self.size)
 		np.random.shuffle(self.indices)
 		
 		self.paths=list(np.array(self.paths)[self.indices])
-		self.labels=list(np.array(self.labels)[self.indices])
+		#self.labels=list(np.array(self.labels)[self.indices])
 
-	def __init__(self,data_dir,batch_size,filenames_list,image_size=None):
+	def __init__(self,data_dir,batch_size,consider_all_images=False,image_size=None):
 		self.data_dir=data_dir
 		self.batch_size=batch_size
-		f=open(filenames_list,'r')
-		self.file_content=f.readlines()
-		self.file_content=[rt.splitlines()[0].split(' ')for rt in self.file_content]
-		self.paths=[i[0]for i in self.file_content]
-		self.labels=[int(i[1]) for i in self.file_content]
+		self.consider_all_images=consider_all_images
+		self.cities=[]
+		self.path_to_cities=[]
+		self.paths=[] # this list will contain total filepath of images being considered
+		if(self.consider_all_images):
+			self.directories=['train','test','val']
+		else:
+			self.directories=['train']
+		for dir in self.directories:
+			k=next(os.walk(os.path.join(self.data_dir,'leftImg8bit',dir)))[1]
+			self.cities.append(k)
+			for city in k:
+				self.path_to_cities.append(os.path.join(self.data_dir,'leftImg8bit',dir,city))
+		for path_to_a_city in self.path_to_cities:
+			k=[x[2] for x in os.walk(path_to_a_city)]
+			for image in k[0]:
+				self.paths.append(os.path.join(path_to_a_city,image))
 		if image_size is None:
-			self.image_size=sp.imread(os.path.join(data_dir,self.paths[0])).shape
+			self.image_size=sp.imread(self.paths[0]).shape
 		else:
 			self.image_size=image_size
 		self.size=np.size(self.paths)
@@ -36,22 +48,23 @@ class face_reader():
 	def next_batch(self):
 		if(self.batch_num<self.n_batches-1):
 			self.chunk_images=self.paths[self.cursor:self.cursor+self.batch_size]
-			self.chunk_labels=self.labels[self.cursor:self.cursor+self.batch_size]
+			#self.chunk_labels=self.labels[self.cursor:self.cursor+self.batch_size]
 			self.cursor=(self.cursor+self.batch_size)%self.size;
 
 
 		elif(self.batch_num==self.n_batches-1):
 			residue=self.size-self.cursor;
 			self.chunk_images=np.concatenate([self.paths[-1*residue:],self.paths[:self.batch_size-residue]])
-			self.chunk_labels=np.concatenate([self.labels[-1*residue:],self.labels[:self.batch_size-residue]])
-			self.cursor=0;
+			#self.chunk_labels=np.concatenate([self.labels[-1*residue:],self.labels[:self.batch_size-residue]])
+			self.cursor=0
 			# self.shuffle_data();
 			# self.epoch=self.epoch+1;
 			# self.batch_num=0;
 		self.batch_num=self.batch_num+1
-		data=[sp.imresize(sp.imread(os.path.join(self.data_dir,i), mode='RGB'),[self.image_size[0],self.image_size[1]]) for i in self.chunk_images]
-		lab=self.chunk_labels
-		return [np.stack(data),np.stack(lab)];
+		data=[sp.imresize(sp.imread(image_path, mode='RGB'),[self.image_size[0],self.image_size[1]]) for image_path in self.chunk_images]
+		#lab=self.chunk_labels
+		return [np.stack(data)]#,np.stack(lab)]
+#cityscape_images_reader('/vulcan/scratch/koutilya/cityscapes/',100,False,image_size=[144,144,3])
 
 
 class single_reader():
@@ -95,6 +108,4 @@ class single_reader():
 
 		data=[sp.imresize(sp.imread(os.path.join(data_dir,i), mode='RGB'),[self.image_size[0],self.image_size[1]],interp='bicubic') for i in self.chunk_data];
 		return np.stack(data);
-
-
 
